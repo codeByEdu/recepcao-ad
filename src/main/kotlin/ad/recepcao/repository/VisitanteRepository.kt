@@ -1,14 +1,9 @@
 package ad.recepcao.repository
 
-import ad.recepcao.model.VisitanteDTO
+import ad.recepcao.model.Visitante
+import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.stereotype.Repository
 
 @Repository
-class VisitanteRepository {
-
-    fun registraVisitante(visitante: VisitanteDTO) {
-
-        TODO()
-    }
-
+interface VisitanteRepository: JpaRepository<Visitante, Long> {
 }
