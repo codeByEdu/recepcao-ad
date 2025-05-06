@@ -1,0 +1,11 @@
+spring:
+  application:
+    name: recepcao-ad
+  datasource:
+    url: jdbc:postgresql:recepcao-db-instance-1.cnks22uwacpj.sa-east-1.rds.amazonaws.com:5432/recepcao-db
+    username: { db.username }
+    password: { db.password }
+  jpa:
+    hibernate:
+      ddl-auto: update  # ou create, validate, none
+    show-sql: true

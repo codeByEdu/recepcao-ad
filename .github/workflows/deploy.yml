@@ -1,0 +1,70 @@
+name: Build, Push and Deploy to ECS
+
+on:
+  push:
+    branches: [ "master" ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    env:
+      AWS_REGION: sa-east-1
+      ECR_REPOSITORY: visitante-api
+      ECS_CLUSTER: visitante_cluster
+      ECS_SERVICE: visitante-service
+      CONTAINER_NAME: visitante-api
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v3
+
+      - name: Configurar AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login no Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Build da imagem Docker
+        run: |
+          docker build -t $ECR_REPOSITORY .
+          docker tag $ECR_REPOSITORY:latest 905418366448.dkr.ecr.sa-east-1.amazonaws.com/$ECR_REPOSITORY:latest
+
+      - name: Push da imagem para o ECR
+        run: |
+          docker push 905418366448.dkr.ecr.sa-east-1.amazonaws.com/$ECR_REPOSITORY:latest
+
+      - name: Obter a Task Definition existente
+        id: get-task-def
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition $ECS_SERVICE \
+            --region $AWS_REGION \
+            --query "taskDefinition" > task-definition.json
+
+      - name: Criar nova Task Definition com imagem atualizada
+        id: register-task-def
+        run: |
+          IMAGE_URI=905418366448.dkr.ecr.sa-east-1.amazonaws.com/$ECR_REPOSITORY:latest
+          jq --arg IMAGE "$IMAGE_URI" \
+            '.containerDefinitions[0].image = $IMAGE' \
+            task-definition.json > new-task-definition.json
+
+          aws ecs register-task-definition \
+            --cli-input-json file://new-task-definition.json \
+            --region $AWS_REGION > task-def-response.json
+
+          TASK_REVISION=$(jq -r '.taskDefinition.taskDefinitionArn' task-def-response.json)
+          echo "TASK_REVISION=$TASK_REVISION" >> $GITHUB_ENV
+
+      - name: Atualizar ECS Service com nova Task Definition
+        run: |
+          aws ecs update-service \
+            --cluster $ECS_CLUSTER \
+            --service $ECS_SERVICE \
+            --task-definition $TASK_REVISION \
+            --region $AWS_REGION
